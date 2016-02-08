@@ -23,6 +23,20 @@ const (
 	// Close a Pool and all connection associated with it
 	//# uint64 poolid ,uint64 pcseqid
 	YuntiNCPProto_PoolClose
+	//# uint64 poolid, uint64 pcseqid
+	YuntiNCPProto_PoolAckOpt
+	//# uint64 poolid, #uint64 socketid
+	YuntiNCPProto_PoolAssociated
+	//#uint64 poolid, uint64 nsocket, [ nint64 socketid, uint64 localseq, uint64 remoteseq  ]
+	YuntiNCPProto_PoolreSync
+	//#uint64 poolid, socketid ,seqid, []byte payload
+	YuntiNCPProto_DataDelivery
+	//#uint64 poolid, socketid ,seqids,seqidto
+	YuntiNCPProto_SocketAck
+	//#uint64 poolid, socketid ,seqids,seqidto
+	YuntiNCPProto_RequestRetranmissmit
+	//#uint64 poolid, socketid, pcseqid
+	YuntiNCPProto_SocketClosed
 )
 
 func InterpretPacket(input chan []byte) error {
