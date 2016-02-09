@@ -6,8 +6,7 @@ type YuntiConnPool struct {
 	TCPConns       *map[uint64](*net.Conn)
 	socketidNext   uint64
 	insocketidNext uint64
-  SocketBuffers  map[uint64](*YuntiBufferStream)
-
+	SocketBuffers  map[uint64](*YuntiBufferStream)
 }
 
 func (pool *YuntiConnPool) Init() {
@@ -20,9 +19,11 @@ func (pool *YuntiConnPool) OpenTCPConn(target string) uint64 {
 	if err != nil {
 		return 0
 	}
-	pool.TCPConns[socketidNext] = dialing
-	pool.InitStreamBuffer(socketidNext)
-	return socketidNext
+	pool.TCPConns[pool.socketidNext] = dialing
+	pool.InitStreamBuffer(pool.socketidNext)
+	socketid := pool.socketidNext
+	pool.socketidNext += 1
+	return socketid
 }
 func (pool *YuntiConnPool) InitStreamBuffer(socketid uint64) {
 
@@ -33,33 +34,50 @@ func (pool *YuntiConnPool) DropTCPConn(socketid uint64) {
 }
 
 type YuntiBufferStream struct {
-	StreamRxNext   uint64
-	StreamTxNext   uint64
-	StreamBufferRx map[uint64]([]byte)
-	StreamBufferTx map[uint64]([]byte)
-  streamid       uint64
-  OutputStream   io.Writer
+	StreamRxNext           uint64
+	StreamTxNext           uint64
+	StreamBufferRx         map[uint64](YuntiPacket)
+	StreamBufferTx         map[uint64](YuntiPacket)
+	streamid               uint64
+	OutputStream           io.Writer
+	OutputPutWorkerTxInput chan YuntiPacket
 }
 
-func(*stream YuntiBufferStream)Init(){
-
-}
-
-func(*stream YuntiBufferStream)InsertPacket(){
+func (stream *YuntiBufferStream) Init() {
 
 }
 
-func(*stream YuntiBufferStream)OutputWorkerTx(input chan YuntiPacket){
-  for{
-    select{
-    case buffer:<-input:
-      stream.StreamBufferTx[buffer.Seqid]=buffer.Payload
-    }
-  }
+func (stream *YuntiBufferStream) InsertPacketTx(inserting YuntiPacket) {
+	stream.OutputPutWorkerTxInput <- inserting
+}
+
+func (stream *YuntiBufferStream) OutputWorkerTx(input chan YuntiPacket) {
+	for {
+		select {
+		case buffer := <-input:
+			stream.StreamBufferTx[buffer.Seqid] = buffer
+			for {
+				if nextSend, nextSendOK := stream.StreamBufferTx[stream.StreamTxNext]; nextSendOK {
+					_, err := stream.OutputStream.Write(nextSend.Payload)
+					if err != nil {
+						return err
+					}
+				} else {
+					break
+				}
+				delete(stream.StreamBufferTx, stream.StreamTxNext)
+				stream.StreamTxNext += 1
+			}
+
+		}
+	}
 
 }
 
-type YuntiPacket struct{
-  Payload []byte
-  Seqid uint64
+type YuntiPacket struct {
+	Payload []byte
+	Seqid   uint64
+}
+
+type InterPoolSyncer struct {
 }
